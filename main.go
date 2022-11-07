@@ -108,11 +108,22 @@ type UserInfo struct {
 	Instagram string `json:"instagram"`
 }
 
+func addCorsHeader(res http.ResponseWriter) {
+	headers := res.Header()
+	headers.Add("Access-Control-Allow-Origin", "*")
+	headers.Add("Vary", "Origin")
+	headers.Add("Vary", "Access-Control-Request-Method")
+	headers.Add("Vary", "Access-Control-Request-Headers")
+	headers.Add("Access-Control-Allow-Headers", "Content-Type, Origin, Accept, token")
+	headers.Add("Access-Control-Allow-Methods", "GET, POST,OPTIONS")
+}
+
 func saveHandler(w http.ResponseWriter, r *http.Request) {
 	log.Println("saveS")
-	w.Header().Set("Content-Type", "text/html; charset=ascii")
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Access-Control-Allow-Headers", "Content-Type,access-control-allow-origin, access-control-allow-headers")
+	addCorsHeader(w)
+	if r.Method == http.MethodOptions {
+		return
+	}
 	body, err := ioutil.ReadAll(r.Body) // response body is []byte
 	defer r.Body.Close()
 
@@ -154,9 +165,14 @@ func getAllPageHandler(w http.ResponseWriter, r *http.Request) {
  <head>
    <meta charset="utf-8">
   <title>Тег А</title>
+<style>
+	a {
+font-size: 20px;
+}
+</style>
  </head>
  <body>
-  <p><a href="/file">link</a></p>
+  <p><a style="font-size: 50px;" href="/file">Download</a></p>
 </body>
 </html>
 `))
