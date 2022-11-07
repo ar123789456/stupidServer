@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
 	"strconv"
 )
 
@@ -33,9 +34,12 @@ func main() {
 	mux.Handle("/file/", http.StripPrefix("/file", fileServer))
 	mux.HandleFunc("/save", saveHandler)
 	mux.HandleFunc("/", getAllPageHandler)
-
-	log.Println("run localhost:8080")
-	err = http.ListenAndServe("localhost:8080", mux)
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "9000" // Default port if not specified
+	}
+	log.Println("run localhost:" + port)
+	err = http.ListenAndServe("localhost:"+port, mux)
 	log.Println(err)
 }
 
