@@ -39,7 +39,7 @@ func main() {
 		port = "9000" // Default port if not specified
 	}
 	log.Println("run localhost:" + port)
-	err = http.ListenAndServe("localhost:"+port, mux)
+	err = http.ListenAndServe(":"+port, mux)
 	log.Println(err)
 }
 
