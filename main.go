@@ -1,34 +1,37 @@
 package main
 
 import (
-	"database/sql"
+	"context"
 	"encoding/json"
-	"fmt"
-	_ "github.com/mattn/go-sqlite3"
 	"github.com/xuri/excelize/v2"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
 	"strconv"
+	"time"
 )
 
-var DB *sql.DB
+var DB *mongo.Client
+
+const uri = "mongodb+srv://user:user@cluster0.stwzkiv.mongodb.net/?retryWrites=true&w=majority"
 
 func main() {
 	log.Println("Init DB")
-	db, err := sql.Open("sqlite3", "test.db")
-	if err != nil {
-		log.Fatalln(err)
-	}
-	var version string
-	err = db.QueryRow("SELECT SQLITE_VERSION()").Scan(&version)
-
+	serverAPIOptions := options.ServerAPI(options.ServerAPIVersion1)
+	clientOptions := options.Client().
+		ApplyURI("mongodb+srv://user:user@cluster0.stwzkiv.mongodb.net/?retryWrites=true&w=majority").
+		SetServerAPIOptions(serverAPIOptions)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	client, err := mongo.Connect(ctx, clientOptions)
 	if err != nil {
 		log.Fatal(err)
 	}
-	createUserTable(db)
-	DB = db
+	DB = client
 	mux := http.NewServeMux()
 	fileServer := http.FileServer(http.Dir("./exl"))
 	mux.Handle("/file/", http.StripPrefix("/file", fileServer))
@@ -74,48 +77,26 @@ func exl(users []UserInfo) error {
 	}
 	return nil
 }
-
-func createUserTable(db *sql.DB) {
-	usersTable := `
-		CREATE TABLE if not exists users (
-        id integer NOT NULL PRIMARY KEY AUTOINCREMENT,
-        "firstName" TEXT,
-        "lastName" TEXT,
-        "email" TEXT,
-        "phone" TEXT,
-        "instagram" TEXT
-        );`
-	query, err := db.Prepare(usersTable)
-	if err != nil {
-		log.Fatal(err)
-	}
-	_, err = query.Exec()
-	if err != nil {
-		log.Fatal(err)
-	}
-	fmt.Println("User table created successfully!")
-}
-
-func createUser(db *sql.DB, info UserInfo) error {
-	query := "INSERT into users (firstName, lastName, email, phone, instagram) values ($1, $2, $3, $4, $5)"
-	_, err := db.Exec(query, info.FirstName, info.LastName, info.Email, info.Phone, info.Instagram)
+func createUser(info UserInfo) error {
+	_, err := DB.Database("main").Collection("users").InsertOne(context.TODO(), &info)
 	return err
 }
-func getAllUsers(db *sql.DB) ([]UserInfo, error) {
+func getAllUsers() ([]UserInfo, error) {
 	log.Println("getAllUsers")
-	query := "select firstName, lastName, email, phone, instagram from users"
-	rows, err := db.Query(query)
+	var userInfos []UserInfo
+	cur, err := DB.Database("main").Collection("users").Find(context.TODO(), bson.D{})
 	if err != nil {
 		return nil, err
 	}
-	var userInfos []UserInfo
-	for rows.Next() {
-		var tp UserInfo
-		if err := rows.Scan(&tp.FirstName, &tp.LastName, &tp.Email, &tp.Phone, &tp.Instagram); err != nil {
+
+	for cur.Next(context.TODO()) {
+		var userinfo UserInfo
+		err = cur.Decode(&userinfo)
+		if err != nil {
 			return nil, err
 		}
-		userInfos = append(userInfos, tp)
-	} //end of for loop
+		userInfos = append(userInfos, userinfo)
+	}
 	return userInfos, nil
 }
 
@@ -145,7 +126,7 @@ func saveHandler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	err = createUser(DB, result)
+	err = createUser(result)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
@@ -156,8 +137,9 @@ func getAllPageHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=ascii")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type,access-control-allow-origin, access-control-allow-headers")
-	users, err := getAllUsers(DB)
+	users, err := getAllUsers()
 	if err != nil {
+		log.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
