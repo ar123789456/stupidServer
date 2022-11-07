@@ -102,6 +102,7 @@ func createUser(db *sql.DB, info UserInfo) error {
 	return err
 }
 func getAllUsers(db *sql.DB) ([]UserInfo, error) {
+	log.Println("getAllUsers")
 	query := "select firstName, lastName, email, phone, instagram from users"
 	rows, err := db.Query(query)
 	if err != nil {
@@ -127,6 +128,7 @@ type UserInfo struct {
 }
 
 func saveHandler(w http.ResponseWriter, r *http.Request) {
+	log.Println("saveS")
 	w.Header().Set("Content-Type", "text/html; charset=ascii")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type,access-control-allow-origin, access-control-allow-headers")
